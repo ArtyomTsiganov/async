@@ -21,30 +21,47 @@ const API = {
 //     });
 // }
 
+function sendRequest(url) {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("GET", url, true);
+
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+                if (xhr.status === 200) {
+                    resolve(JSON.parse(xhr.response));
+                } else {
+                    reject(new Error(xhr.statusText));
+                }
+            }
+        };
+
+        xhr.onerror = () => reject(new Error("Network Error"));
+        xhr.send();
+    });
+}
+
 async function run() {
-    const orgOgrns = await sendRequest(API.organizationList);
-    const ogrns = orgOgrns.join(",");
+    try {
+        const orgOgrns = await sendRequest(API.organizationList);
+        const ogrns = orgOgrns.join(",");
 
-    const requisites = await sendRequest(`${API.orgReqs}?ogrn=${ogrns}`);
-    const orgsMap = reqsToMap(requisites);
+        const requisites = await sendRequest(`${API.orgReqs}?ogrn=${ogrns}`);
+        const orgsMap = reqsToMap(requisites);
 
-    const [analytics, buh] = await Promise.all([
-        sendRequest(`${API.analytics}?ogrn=${ogrns}`),
-        sendRequest(`${API.buhForms}?ogrn=${ogrns}`)
-    ]);
+        const analytics = await sendRequest(`${API.analytics}?ogrn=${ogrns}`);
+        addInOrgsMap(orgsMap, analytics, "analytics");
 
-    addInOrgsMap(orgsMap, analytics, "analytics");
-    addInOrgsMap(orgsMap, buh, "buhForms");
+        const buh = await sendRequest(`${API.buhForms}?ogrn=${ogrns}`);
+        addInOrgsMap(orgsMap, buh, "buhForms");
 
-    render(orgsMap, orgOgrns);
+        render(orgsMap, orgOgrns);
+    } catch (error) {
+        console.error(error);
+    }
 }
 
 run();
-
-function sendRequest(url, callback) {
-    return fetch(url, { method: "GET" })
-        .then(response => callback(response.json()))
-}
 
 function reqsToMap(requisites) {
     return requisites.reduce((acc, item) => {
